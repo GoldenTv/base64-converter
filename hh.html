@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Base64 Image Converter</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --border: #2a2a3a;
+    --accent: #00ffc8;
+    --accent2: #7c3aed;
+    --text: #e8e8f0;
+    --muted: #666680;
+    --mono: 'IBM Plex Mono', monospace;
+    --display: 'Syne', sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.3;
+    pointer-events: none;
+  }
+
+  header {
+    padding: 2.5rem 2rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    position: relative;
+  }
+
+  .logo-dot {
+    width: 12px; height: 12px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 20px var(--accent);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.85); }
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-size: clamp(1.4rem, 3vw, 2rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+
+  h1 span { color: var(--accent); }
+
+  .tag {
+    margin-left: auto;
+    font-size: 0.65rem;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 0.2rem 0.6rem;
+    border-radius: 2px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+
+  .tab {
+    padding: 1rem 2rem;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    color: var(--muted);
+    border: none;
+    background: none;
+    transition: color 0.2s;
+    position: relative;
+  }
+
+  .tab.active {
+    color: var(--accent);
+  }
+
+  .tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    box-shadow: 0 0 10px var(--accent);
+  }
+
+  .tab:hover:not(.active) { color: var(--text); }
+
+  .panel { display: none; padding: 2rem; }
+  .panel.active { display: block; }
+
+  /* PANEL 1: Image → Base64 */
+  .drop-zone {
+    border: 1px dashed var(--border);
+    border-radius: 4px;
+    padding: 3rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    background: var(--surface);
+  }
+
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(0, 255, 200, 0.04);
+  }
+
+  .drop-zone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .drop-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.8rem;
+    opacity: 0.6;
+  }
+
+  .drop-label {
+    font-size: 0.85rem;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .drop-label strong { color: var(--accent); }
+
+  .preview-wrap {
+    display: none;
+    margin-top: 1.5rem;
+    gap: 1.5rem;
+    grid-template-columns: auto 1fr;
+    align-items: start;
+  }
+
+  .preview-wrap.show { display: grid; }
+
+  .preview-img {
+    max-width: 200px;
+    max-height: 200px;
+    border: 1px solid var(--border);
+    display: block;
+  }
+
+  .preview-info {
+    font-size: 0.75rem;
+    color: var(--muted);
+    line-height: 2;
+  }
+
+  .preview-info strong { color: var(--text); }
+
+  textarea {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    padding: 1rem;
+    resize: vertical;
+    min-height: 140px;
+    line-height: 1.5;
+    margin-top: 1.5rem;
+    transition: border-color 0.2s;
+  }
+
+  textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .actions {
+    display: flex;
+    gap: 0.8rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
+
+  button.btn {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    padding: 0.6rem 1.4rem;
+    border-radius: 3px;
+    cursor: pointer;
+    border: 1px solid;
+    transition: all 0.18s;
+    text-transform: uppercase;
+  }
+
+  button.btn-primary {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+
+  button.btn-primary:hover {
+    background: transparent;
+    color: var(--accent);
+    box-shadow: 0 0 15px rgba(0,255,200,0.25);
+  }
+
+  button.btn-ghost {
+    background: transparent;
+    color: var(--muted);
+    border-color: var(--border);
+  }
+
+  button.btn-ghost:hover {
+    color: var(--text);
+    border-color: var(--text);
+  }
+
+  /* PANEL 2: Base64 → Image */
+  .result-area {
+    margin-top: 1.5rem;
+    display: none;
+  }
+
+  .result-area.show { display: block; }
+
+  .result-label {
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.8rem;
+  }
+
+  .result-img-wrap {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    padding: 1rem;
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    max-width: 100%;
+  }
+
+  .result-img-wrap img {
+    max-width: 100%;
+    max-height: 400px;
+    display: block;
+  }
+
+  .notice {
+    font-size: 0.72rem;
+    color: var(--muted);
+    padding: 0.8rem;
+    border-left: 2px solid var(--accent2);
+    background: rgba(124,58,237,0.06);
+    margin-top: 1rem;
+    line-height: 1.7;
+  }
+
+  .err {
+    font-size: 0.75rem;
+    color: #ff4d6d;
+    margin-top: 0.8rem;
+    display: none;
+  }
+
+  @media (max-width: 600px) {
+    .preview-wrap { grid-template-columns: 1fr; }
+    header { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-dot"></div>
+  <h1>Base64 <span>⇄</span> Image</h1>
+  <div class="tag">Converter</div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab(0)">▸ Image → Base64</button>
+  <button class="tab" onclick="switchTab(1)">▸ Base64 → Image</button>
+</div>
+
+<!-- PANEL 1 -->
+<div class="panel active" id="panel0">
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept="image/*" onchange="handleFile(this.files[0])">
+    <div class="drop-icon">🖼</div>
+    <div class="drop-label">
+      <strong>Click or drag & drop image here</strong><br>
+      Supports JPG, PNG, GIF, WEBP, SVG
+    </div>
+  </div>
+
+  <div class="preview-wrap" id="previewWrap">
+    <img class="preview-img" id="previewImg" src="" alt="preview">
+    <div class="preview-info" id="previewInfo"></div>
+  </div>
+
+  <div class="b64-preview" id="b64Preview" style="display:none; margin-top:1.5rem; background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:1rem;">
+    <div style="font-size:0.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:0.5rem;">Base64 Preview</div>
+    <div id="b64PreviewText" style="font-size:0.72rem; color:var(--text); word-break:break-all; max-height:80px; overflow:hidden; opacity:0.6;"></div>
+  </div>
+
+  <div class="actions" style="margin-top:1.2rem;">
+    <button class="btn btn-primary" onclick="downloadTxt()">Download .txt</button>
+    <button class="btn btn-ghost" onclick="downloadJson()">Download .json</button>
+    <button class="btn btn-ghost" onclick="clearAll()">Clear</button>
+  </div>
+</div>
+
+<!-- PANEL 2 -->
+<div class="panel" id="panel1">
+  <div class="notice">
+    Upload a <strong>.txt</strong> or <strong>.json</strong> file containing Base64 string — or paste directly below
+  </div>
+
+  <div class="drop-zone" id="dropZone2" style="margin-top:1rem; padding:2rem;">
+    <input type="file" id="txtInput" accept=".txt,.json,text/plain,application/json" onchange="handleTxtFile(this.files[0])">
+    <div class="drop-icon" style="font-size:1.8rem;">📄</div>
+    <div class="drop-label"><strong>Upload .txt or .json file</strong><br>or paste Base64 below</div>
+  </div>
+
+  <textarea id="base64In" placeholder="Or paste Base64 string here..." oninput="liveConvert()" style="margin-top:1rem;"></textarea>
+
+  <div class="err" id="errMsg">❌ Invalid Base64 or not an image</div>
+
+  <div class="result-area" id="resultArea">
+    <div class="result-label">Result</div>
+    <div class="result-img-wrap">
+      <img id="resultImg" src="" alt="decoded image">
+      <div class="actions">
+        <button class="btn btn-primary" onclick="downloadImg()">Download Image</button>
+        <button class="btn btn-ghost" onclick="clearPanel2()">Clear</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentB64 = '';
+  let currentFilename = 'image';
+
+  function switchTab(i) {
+    document.querySelectorAll('.tab').forEach((t, idx) => t.classList.toggle('active', idx === i));
+    document.querySelectorAll('.panel').forEach((p, idx) => p.classList.toggle('active', idx === i));
+  }
+
+  // Panel 1: drag/drop image
+  const dropZone = document.getElementById('dropZone');
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+
+  function handleFile(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    currentFilename = file.name.replace(/\.[^.]+$/, '');
+    const reader = new FileReader();
+    reader.onload = e => {
+      currentB64 = e.target.result;
+      document.getElementById('previewImg').src = currentB64;
+      document.getElementById('previewWrap').classList.add('show');
+      document.getElementById('previewInfo').innerHTML =
+        `<strong>Filename:</strong> ${file.name}<br>` +
+        `<strong>Type:</strong> ${file.type}<br>` +
+        `<strong>Size:</strong> ${(file.size / 1024).toFixed(1)} KB<br>` +
+        `<strong>Base64 length:</strong> ${currentB64.length.toLocaleString()} chars`;
+      // show preview
+      const prev = document.getElementById('b64Preview');
+      prev.style.display = 'block';
+      document.getElementById('b64PreviewText').textContent = currentB64.substring(0, 200) + '...';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function downloadTxt() {
+    if (!currentB64) return;
+    const blob = new Blob([currentB64], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${currentFilename}-base64.txt`;
+    a.click();
+  }
+
+  function downloadJson() {
+    if (!currentB64) return;
+    const json = JSON.stringify({ filename: currentFilename, base64: currentB64 }, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${currentFilename}-base64.json`;
+    a.click();
+  }
+
+  function clearAll() {
+    currentB64 = '';
+    document.getElementById('previewWrap').classList.remove('show');
+    document.getElementById('b64Preview').style.display = 'none';
+    document.getElementById('fileInput').value = '';
+  }
+
+  // Panel 2: upload txt/json file
+  const dropZone2 = document.getElementById('dropZone2');
+  dropZone2.addEventListener('dragover', e => { e.preventDefault(); dropZone2.classList.add('drag-over'); });
+  dropZone2.addEventListener('dragleave', () => dropZone2.classList.remove('drag-over'));
+  dropZone2.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone2.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) handleTxtFile(e.dataTransfer.files[0]);
+  });
+
+  function handleTxtFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      let content = e.target.result.trim();
+      // If JSON, extract base64 field
+      if (file.name.endsWith('.json')) {
+        try {
+          const parsed = JSON.parse(content);
+          content = parsed.base64 || parsed.data || Object.values(parsed).find(v => typeof v === 'string' && v.length > 100) || content;
+        } catch(err) { /* use raw */ }
+      }
+      document.getElementById('base64In').value = content;
+      decode();
+    };
+    reader.readAsText(file);
+  }
+
+  let debounceTimer;
+  function liveConvert() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(decode, 400);
+  }
+
+  function decode() {
+    let raw = document.getElementById('base64In').value.trim();
+    const err = document.getElementById('errMsg');
+    const result = document.getElementById('resultArea');
+    const img = document.getElementById('resultImg');
+
+    if (!raw) { err.style.display = 'none'; result.classList.remove('show'); return; }
+
+    let src = raw;
+    if (!raw.startsWith('data:')) {
+      src = 'data:image/png;base64,' + raw;
+    }
+
+    const test = new Image();
+    test.onload = () => {
+      err.style.display = 'none';
+      img.src = src;
+      result.classList.add('show');
+    };
+    test.onerror = () => {
+      result.classList.remove('show');
+      err.style.display = 'block';
+    };
+    test.src = src;
+  }
+
+  function downloadImg() {
+    const src = document.getElementById('resultImg').src;
+    const a = document.createElement('a');
+    a.href = src;
+    const ext = src.includes('image/png') ? 'png' : src.includes('image/jpeg') ? 'jpg' : src.includes('image/gif') ? 'gif' : 'png';
+    a.download = `decoded-image.${ext}`;
+    a.click();
+  }
+
+  function clearPanel2() {
+    document.getElementById('base64In').value = '';
+    document.getElementById('txtInput').value = '';
+    document.getElementById('resultArea').classList.remove('show');
+    document.getElementById('errMsg').style.display = 'none';
+  }
+</script>
+</body>
+</html>
